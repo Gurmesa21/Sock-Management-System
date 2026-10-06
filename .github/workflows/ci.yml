@@ -33,9 +33,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
-
   backend:
     name: Backend
     runs-on: ubuntu-latest
