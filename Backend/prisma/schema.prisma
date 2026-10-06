@@ -1,0 +1,1528 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                          String                @id @default(uuid()) @db.Uuid
+  username                    String                @unique @db.VarChar(50)
+  email                       String                @unique @db.VarChar(255)
+  fullName                    String                @db.VarChar(150)
+  phone                       String?               @db.VarChar(30)
+  department                  String?               @db.VarChar(150)
+  passwordHash                String                @db.VarChar(255)
+  isActive                    Boolean               @default(true)
+  createdAt                   DateTime              @default(now())
+  updatedAt                   DateTime              @updatedAt
+  departmentId                String?               @db.Uuid
+  preferences                 Json?                 @default("{}")
+  assetAssignments            AssetAssignment[]     @relation("AssetAssignmentUser")
+  assetsAssigned              Asset[]               @relation("AssetAssignedUser")
+  auditLogs                   AuditLog[]            @relation("AuditActor")
+  dispatchSecurity            DispatchRecord[]      @relation("DispatchSecurityOfficer")
+  disposalApprovalActions     DisposalApproval[]    @relation("DisposalApprovalUser")
+  disposalRecords             DisposalRecord[]      @relation("DisposalRecorder")
+  disposalApprovals           DisposalRequest[]     @relation("DisposalApprover")
+  disposalInspections         DisposalRequest[]     @relation("DisposalInspector")
+  disposalRequests            DisposalRequest[]     @relation("DisposalRequester")
+  gatePassesIssued            GatePass[]            @relation("GatePassIssuedTo")
+  securityGatePasses          GatePass[]            @relation("GatePassSecurityOfficer")
+  goodsReceiptsReceived       GoodsReceipt[]        @relation("GoodsReceiptReceivedBy")
+  goodsReceiptsVerified       GoodsReceipt[]        @relation("GoodsReceiptVerifiedBy")
+  grnsCreated                 GRN[]                 @relation("GRNCreatedBy")
+  inspectionsApproved         Inspection[]          @relation("InspectionApprovedBy")
+  inspectionsPerformed        Inspection[]          @relation("InspectionInspector")
+  issueVouchersReceived       IssueVoucher[]        @relation("IssueVoucherRecipient")
+  returnApprovals             MaterialReturn[]      @relation("ReturnApprover")
+  returnInspections           MaterialReturn[]      @relation("ReturnInspector")
+  returnRequests              MaterialReturn[]      @relation("ReturnRequester")
+  notifications               Notification[]
+  resetTokens                 PasswordResetToken[]
+  purchaseOrdersCreated       PurchaseOrder[]       @relation("PurchaseOrderCreator")
+  requisitionsApproved        PurchaseRequisition[] @relation("RequisitionApprover")
+  requisitionsRequested       PurchaseRequisition[] @relation("RequisitionRequester")
+  requisitionApprovals        RequisitionApproval[] @relation("RequisitionApprover")
+  sessions                    Session[]
+  adjustmentsApproved         StockAdjustment[]     @relation("AdjustmentApprover")
+  adjustmentsRequested        StockAdjustment[]     @relation("AdjustmentRequester")
+  stockCounts                 StockCount[]          @relation("StockCountUser")
+  discrepancyInvestigations   StockDiscrepancy[]    @relation("DiscrepancyInvestigator")
+  stockTakingsStarted         StockTaking[]         @relation("StockTakingStartedBy")
+  stockTransactions           StockTransaction[]
+  approvedTransfers           StockTransfer[]       @relation("TransferApprover")
+  requestedTransfers          StockTransfer[]       @relation("TransferRequester")
+  storeIssuesIssued           StoreIssue[]          @relation("StoreIssueIssuer")
+  storeRequisitionsRequested  StoreRequisition[]    @relation("StoreRequisitionRequester")
+  supportingDocumentsUploaded SupportingDocument[]  @relation("SupportingDocumentUploader")
+  technicalEvaluations        TechnicalEvaluation[] @relation("TechnicalEvaluator")
+  materialCards               UserMaterialCard[]    @relation("UserMaterialCardUser")
+  roles                       UserRole[]
+  departmentRef               Department?           @relation(fields: [departmentId], references: [id])
+
+  @@index([email])
+  @@index([isActive])
+  @@index([departmentId])
+  @@map("users")
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique @db.VarChar(80)
+  description String?          @db.VarChar(255)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique @db.VarChar(100)
+  description String?          @db.VarChar(255)
+  createdAt   DateTime         @default(now())
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId     String   @db.Uuid
+  roleId     String   @db.Uuid
+  assignedAt DateTime @default(now())
+  assignedBy String?  @db.Uuid
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  assignedAt   DateTime   @default(now())
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model Session {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  tokenVersion String?   @db.VarChar(100)
+  userAgent    String?   @db.VarChar(500)
+  ipAddress    String?   @db.VarChar(64)
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique @db.VarChar(128)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid
+  action     String   @db.VarChar(100)
+  resource   String?  @db.VarChar(100)
+  resourceId String?  @db.VarChar(100)
+  method     String?  @db.VarChar(10)
+  path       String?  @db.VarChar(500)
+  ipAddress  String?  @db.VarChar(64)
+  userAgent  String?  @db.VarChar(500)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("AuditActor", fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+model Department {
+  id                   String                @id @default(uuid()) @db.Uuid
+  code                 String                @unique @db.VarChar(30)
+  name                 String                @db.VarChar(150)
+  description          String?               @db.VarChar(500)
+  status               String                @default("Active") @db.VarChar(20)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  assetAssignments     AssetAssignment[]
+  assets               Asset[]
+  issueVouchers        IssueVoucher[]
+  purchaseRequisitions PurchaseRequisition[]
+  storeRequisitions    StoreRequisition[]
+  stores               Store[]
+  gatePasses           GatePass[]
+  materialCards        UserMaterialCard[]    @relation("UserMaterialCardDepartment")
+  users                User[]
+  warehouses           Warehouse[]
+
+  @@index([status])
+  @@index([name])
+  @@map("departments")
+}
+
+model Unit {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique @db.VarChar(30)
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(500)
+  status      String   @default("Active") @db.VarChar(20)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  items       Item[]
+
+  @@index([status])
+  @@index([name])
+  @@map("units")
+}
+
+model Store {
+  id                   String                @id @default(uuid()) @db.Uuid
+  code                 String                @unique @db.VarChar(30)
+  name                 String                @db.VarChar(150)
+  type                 String                @db.VarChar(30)
+  departmentId         String?               @db.Uuid
+  location             String?               @db.VarChar(255)
+  description          String?               @db.VarChar(500)
+  status               String                @default("Active") @db.VarChar(20)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  goodsReceipts        GoodsReceipt[]        @relation("GoodsReceiptStore")
+  grns                 GRN[]                 @relation("GRNStore")
+  items                Item[]
+  locations            Location[]
+  purchaseRequisitions PurchaseRequisition[]
+  stockTakings         StockTaking[]
+  storeIssues          StoreIssue[]
+  storeRequisitions    StoreRequisition[]
+  departmentRef        Department?           @relation(fields: [departmentId], references: [id])
+
+  @@index([departmentId])
+  @@index([status])
+  @@index([name])
+  @@map("stores")
+}
+
+model Warehouse {
+  id            String      @id @default(uuid()) @db.Uuid
+  code          String      @unique @db.VarChar(30)
+  name          String      @db.VarChar(150)
+  type          String      @db.VarChar(30)
+  departmentId  String?     @db.Uuid
+  location      String?     @db.VarChar(255)
+  description   String?     @db.VarChar(500)
+  status        String      @default("Active") @db.VarChar(20)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  shelves       Shelf[]
+  departmentRef Department? @relation(fields: [departmentId], references: [id])
+
+  @@index([departmentId])
+  @@index([status])
+  @@index([name])
+  @@map("warehouses")
+}
+
+model Shelf {
+  id          String     @id @default(uuid()) @db.Uuid
+  code        String     @unique @db.VarChar(30)
+  name        String     @db.VarChar(150)
+  warehouseId String     @db.Uuid
+  section     String?    @db.VarChar(50)
+  description String?    @db.VarChar(500)
+  status      String     @default("Active") @db.VarChar(20)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  locations   Location[]
+  warehouse   Warehouse  @relation(fields: [warehouseId], references: [id])
+
+  @@index([warehouseId])
+  @@index([status])
+  @@map("shelves")
+}
+
+model Location {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  code                  String                 @unique @db.VarChar(30)
+  storeId               String?                @db.Uuid
+  shelfId               String                 @db.Uuid
+  section               String?                @db.VarChar(50)
+  bin                   String?                @db.VarChar(50)
+  description           String?                @db.VarChar(500)
+  status                String                 @default("Active") @db.VarChar(20)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  assets                Asset[]
+  binCards              BinCard[]
+  disposalRequests      DisposalRequest[]
+  goodsReceiptItems     GoodsReceiptItem[]     @relation("GoodsReceiptItemLocations")
+  grnItems              GRNItem[]              @relation("GRNItemLocations")
+  inventoryBalances     InventoryBalance[]
+  items                 Item[]
+  shelf                 Shelf                  @relation(fields: [shelfId], references: [id])
+  store                 Store?                 @relation(fields: [storeId], references: [id])
+  returnItems           MaterialReturnItem[]
+  adjustments           StockAdjustment[]
+  stockBatches          StockBatch[]
+  stockCards            StockCard[]
+  stockCounts           StockCount[]
+  discrepancies         StockDiscrepancy[]
+  stockTransactions     StockTransaction[]
+  destinationTransfers  StockTransfer[]        @relation("TransferDestination")
+  sourceTransfers       StockTransfer[]        @relation("TransferSource")
+  storeIssueItems       StoreIssueItem[]
+  storeRequisitionItems StoreRequisitionItem[]
+
+  @@index([storeId])
+  @@index([shelfId])
+  @@index([status])
+  @@map("locations")
+}
+
+model Category {
+  id                       String                    @id @default(uuid()) @db.Uuid
+  code                     String                    @unique @db.VarChar(30)
+  name                     String                    @db.VarChar(150)
+  storeType                String?                   @db.VarChar(30)
+  description              String?                   @db.VarChar(500)
+  status                   String                    @default("Active") @db.VarChar(20)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  deliveryItems            DeliveryItem[]
+  items                    Item[]
+  purchaseOrderItems       PurchaseOrderItem[]
+  purchaseRequisitionItems PurchaseRequisitionItem[]
+
+  @@index([storeType])
+  @@index([status])
+  @@index([name])
+  @@map("categories")
+}
+
+model Item {
+  id                       String                    @id @default(uuid()) @db.Uuid
+  code                     String                    @unique @db.VarChar(50)
+  name                     String                    @db.VarChar(200)
+  categoryId               String                    @db.Uuid
+  type                     String                    @db.VarChar(50)
+  unitId                   String                    @db.Uuid
+  storeId                  String                    @db.Uuid
+  locationId               String?                   @db.Uuid
+  minimum                  Int                       @default(0)
+  maximum                  Int                       @default(0)
+  reorder                  Int                       @default(0)
+  status                   String                    @default("Active") @db.VarChar(20)
+  description              String?                   @db.VarChar(500)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  assets                   Asset[]
+  binCards                 BinCard[]
+  deliveryItems            DeliveryItem[]
+  disposalRequests         DisposalRequest[]
+  gatePassItems            GatePassItem[]
+  goodsReceiptItems        GoodsReceiptItem[]        @relation("GoodsReceiptItems")
+  grnItems                 GRNItem[]                 @relation("GRNItems")
+  inventoryBalances        InventoryBalance[]
+  category                 Category                  @relation(fields: [categoryId], references: [id])
+  location                 Location?                 @relation(fields: [locationId], references: [id])
+  store                    Store                     @relation(fields: [storeId], references: [id])
+  unit                     Unit                      @relation(fields: [unitId], references: [id])
+  returnItems              MaterialReturnItem[]
+  purchaseOrderItems       PurchaseOrderItem[]
+  purchaseRequisitionItems PurchaseRequisitionItem[]
+  adjustments              StockAdjustment[]
+  stockBatches             StockBatch[]
+  stockCards               StockCard[]
+  stockCounts              StockCount[]
+  discrepancies            StockDiscrepancy[]
+  stockTransactions        StockTransaction[]
+  stockTransfers           StockTransferItem[]
+  storeIssueItems          StoreIssueItem[]
+  storeRequisitionItems    StoreRequisitionItem[]
+
+  @@index([categoryId])
+  @@index([unitId])
+  @@index([storeId])
+  @@index([locationId])
+  @@index([status])
+  @@index([name])
+  @@map("items")
+}
+
+model Supplier {
+  id                   String                @id @default(uuid()) @db.Uuid
+  code                 String                @unique @db.VarChar(30)
+  name                 String                @db.VarChar(200)
+  contact              String?               @db.VarChar(150)
+  phone                String?               @db.VarChar(30)
+  email                String?               @db.VarChar(255)
+  address              String?               @db.VarChar(255)
+  description          String?               @db.VarChar(500)
+  status               String                @default("Active") @db.VarChar(20)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  deliveries           Delivery[]
+  goodsReceipts        GoodsReceipt[]        @relation("GoodsReceiptSupplier")
+  grns                 GRN[]                 @relation("GRNSupplier")
+  purchaseOrders       PurchaseOrder[]
+  purchaseRequisitions PurchaseRequisition[]
+
+  @@index([status])
+  @@index([name])
+  @@map("suppliers")
+}
+
+model PurchaseRequisition {
+  id              String                    @id @default(uuid()) @db.Uuid
+  requestNumber   String                    @unique @db.VarChar(30)
+  requesterId     String                    @db.Uuid
+  departmentId    String                    @db.Uuid
+  storeId         String                    @db.Uuid
+  supplierId      String?                   @db.Uuid
+  requiredDate    DateTime
+  purpose         String                    @db.VarChar(500)
+  notes           String?                   @db.VarChar(1000)
+  status          ProcurementStatus         @default(DRAFT)
+  rejectionReason String?                   @db.VarChar(500)
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  approvedById    String?                   @db.Uuid
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  purchaseOrders  PurchaseOrder[]
+  items           PurchaseRequisitionItem[]
+  approvedBy      User?                     @relation("RequisitionApprover", fields: [approvedById], references: [id])
+  department      Department                @relation(fields: [departmentId], references: [id])
+  requester       User                      @relation("RequisitionRequester", fields: [requesterId], references: [id])
+  store           Store                     @relation(fields: [storeId], references: [id])
+  supplier        Supplier?                 @relation(fields: [supplierId], references: [id])
+  estimatedCost   Decimal?                  @db.Decimal(16, 2)
+
+  @@index([requesterId])
+  @@index([departmentId])
+  @@index([storeId])
+  @@index([supplierId])
+  @@index([status])
+  @@index([requiredDate])
+  @@index([createdAt])
+  @@map("purchase_requisitions")
+}
+
+model PurchaseRequisitionItem {
+  id                 String              @id @default(uuid()) @db.Uuid
+  requisitionId      String              @db.Uuid
+  itemId             String              @db.Uuid
+  quantity           Decimal             @db.Decimal(14, 2)
+  notes              String?             @db.VarChar(500)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  categoryId         String?             @db.Uuid
+  purchaseOrderItems PurchaseOrderItem[]
+  category           Category?           @relation(fields: [categoryId], references: [id])
+  item               Item                @relation(fields: [itemId], references: [id])
+  requisition        PurchaseRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+
+  @@index([requisitionId])
+  @@index([itemId])
+  @@map("purchase_requisition_items")
+}
+
+model PurchaseOrder {
+  id                   String              @id @default(uuid()) @db.Uuid
+  orderNumber          String              @unique @db.VarChar(30)
+  requisitionId        String              @db.Uuid
+  supplierId           String              @db.Uuid
+  createdById          String              @db.Uuid
+  orderDate            DateTime            @default(now())
+  expectedDeliveryDate DateTime?
+  status               ProcurementStatus   @default(ORDERED)
+  subtotal             Decimal             @default(0) @db.Decimal(16, 2)
+  totalAmount          Decimal             @default(0) @db.Decimal(16, 2)
+  notes                String?             @db.VarChar(1000)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  deliveries           Delivery[]
+  goodsReceipts        GoodsReceipt[]      @relation("PurchaseOrderGoodsReceipts")
+  items                PurchaseOrderItem[]
+  createdBy            User                @relation("PurchaseOrderCreator", fields: [createdById], references: [id])
+  requisition          PurchaseRequisition @relation(fields: [requisitionId], references: [id])
+  supplier             Supplier            @relation(fields: [supplierId], references: [id])
+
+  @@index([requisitionId])
+  @@index([supplierId])
+  @@index([createdById])
+  @@index([status])
+  @@index([orderDate])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id                String                   @id @default(uuid()) @db.Uuid
+  purchaseOrderId   String                   @db.Uuid
+  requisitionItemId String?                  @db.Uuid
+  itemId            String                   @db.Uuid
+  quantity          Decimal                  @db.Decimal(14, 2)
+  unitPrice         Decimal                  @db.Decimal(16, 2)
+  totalPrice        Decimal                  @db.Decimal(16, 2)
+  deliveredQuantity Decimal                  @default(0) @db.Decimal(14, 2)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  categoryId        String?                  @db.Uuid
+  deliveryItems     DeliveryItem[]
+  category          Category?                @relation(fields: [categoryId], references: [id])
+  item              Item                     @relation(fields: [itemId], references: [id])
+  purchaseOrder     PurchaseOrder            @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  requisitionItem   PurchaseRequisitionItem? @relation(fields: [requisitionItemId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@index([requisitionItemId])
+  @@index([itemId])
+  @@map("purchase_order_items")
+}
+
+model Delivery {
+  id               String         @id @default(uuid()) @db.Uuid
+  deliveryNumber   String         @unique @db.VarChar(30)
+  purchaseOrderId  String         @db.Uuid
+  supplierId       String         @db.Uuid
+  expectedDate     DateTime?
+  actualDate       DateTime?
+  status           DeliveryStatus @default(IN_TRANSIT)
+  notes            String?        @db.VarChar(1000)
+  goodsReceivingId String?        @db.Uuid
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  purchaseOrder    PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id])
+  supplier         Supplier       @relation(fields: [supplierId], references: [id])
+  items            DeliveryItem[]
+  goodsReceipts    GoodsReceipt[] @relation("DeliveryGoodsReceipts")
+
+  @@index([purchaseOrderId])
+  @@index([supplierId])
+  @@index([status])
+  @@index([expectedDate])
+  @@index([actualDate])
+  @@map("deliveries")
+}
+
+model DeliveryItem {
+  id                  String            @id @default(uuid()) @db.Uuid
+  deliveryId          String            @db.Uuid
+  purchaseOrderItemId String            @db.Uuid
+  itemId              String            @db.Uuid
+  quantity            Decimal           @db.Decimal(14, 2)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  categoryId          String?           @db.Uuid
+  category            Category?         @relation(fields: [categoryId], references: [id])
+  delivery            Delivery          @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  item                Item              @relation(fields: [itemId], references: [id])
+  purchaseOrderItem   PurchaseOrderItem @relation(fields: [purchaseOrderItemId], references: [id])
+
+  @@index([deliveryId])
+  @@index([purchaseOrderItemId])
+  @@index([itemId])
+  @@map("delivery_items")
+}
+
+model GoodsReceipt {
+  id                  String               @id @default(uuid()) @db.Uuid
+  receiptNumber       String               @unique @db.VarChar(50)
+  deliveryId          String?              @db.Uuid
+  purchaseOrderId     String?              @db.Uuid
+  supplierId          String               @db.Uuid
+  storeId             String               @db.Uuid
+  sourceType          String               @default("PURCHASE_ORDER") @db.VarChar(30)
+  purchaseReference   String?              @db.VarChar(100)
+  receiptType         String               @default("Purchase Order") @db.VarChar(50)
+  documentReference   String?              @db.VarChar(150)
+  deliveryDate        DateTime
+  description         String?              @db.VarChar(1000)
+  status              String               @default("VERIFICATION_PENDING") @db.VarChar(40)
+  receivedById        String               @db.Uuid
+  verifiedById        String?              @db.Uuid
+  verifiedAt          DateTime?
+  evaluationDecision  String?              @db.VarChar(30)
+  evaluationRemarks   String?              @db.VarChar(1000)
+  inventoryPosted     Boolean              @default(false)
+  inventoryPostedAt   DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  items               GoodsReceiptItem[]
+  delivery            Delivery?            @relation("DeliveryGoodsReceipts", fields: [deliveryId], references: [id], onDelete: Restrict)
+  purchaseOrder       PurchaseOrder?       @relation("PurchaseOrderGoodsReceipts", fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  receivedBy          User                 @relation("GoodsReceiptReceivedBy", fields: [receivedById], references: [id])
+  store               Store                @relation("GoodsReceiptStore", fields: [storeId], references: [id])
+  supplier            Supplier             @relation("GoodsReceiptSupplier", fields: [supplierId], references: [id])
+  verifiedBy          User?                @relation("GoodsReceiptVerifiedBy", fields: [verifiedById], references: [id])
+  grns                GRN?
+  inspections         Inspection[]
+  supportingDocuments SupportingDocument[]
+
+  @@index([deliveryId])
+  @@index([purchaseOrderId])
+  @@index([supplierId])
+  @@index([storeId])
+  @@index([status])
+  @@index([deliveryDate])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptItem {
+  id                  String           @id @default(uuid()) @db.Uuid
+  goodsReceiptId      String           @db.Uuid
+  itemId              String           @db.Uuid
+  locationId          String?          @db.Uuid
+  quantityExpected    Int              @default(0)
+  quantityReceived    Int
+  acceptedQuantity    Int              @default(0)
+  rejectedQuantity    Int              @default(0)
+  unit                String           @db.VarChar(50)
+  condition           String?          @db.VarChar(100)
+  assetClassification String           @default("NON_FIXED") @db.VarChar(30)
+  remarks             String?          @db.VarChar(500)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  goodsReceipt        GoodsReceipt     @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  item                Item             @relation("GoodsReceiptItems", fields: [itemId], references: [id])
+  location            Location?        @relation("GoodsReceiptItemLocations", fields: [locationId], references: [id])
+  grnItems            GRNItem[]
+  inspectionItems     InspectionItem[]
+
+  @@index([goodsReceiptId])
+  @@index([itemId])
+  @@index([locationId])
+  @@map("goods_receipt_items")
+}
+
+model Inspection {
+  id                   String               @id @default(uuid()) @db.Uuid
+  goodsReceiptId       String               @db.Uuid
+  inspectorId          String               @db.Uuid
+  inspectionDate       DateTime             @default(now())
+  quantityVerification String               @default("Passed") @db.VarChar(50)
+  qualityVerification  String               @default("Passed") @db.VarChar(50)
+  status               String               @default("PENDING") @db.VarChar(30)
+  decision             String?              @db.VarChar(30)
+  remarks              String?              @db.VarChar(1000)
+  approvedById         String?              @db.Uuid
+  approvedAt           DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  items                InspectionItem[]
+  approvedBy           User?                @relation("InspectionApprovedBy", fields: [approvedById], references: [id])
+  goodsReceipt         GoodsReceipt         @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  inspector            User                 @relation("InspectionInspector", fields: [inspectorId], references: [id])
+  technicalEvaluation  TechnicalEvaluation?
+
+  @@index([goodsReceiptId])
+  @@index([inspectorId])
+  @@index([status])
+  @@map("inspections")
+}
+
+model InspectionItem {
+  id                 String           @id @default(uuid()) @db.Uuid
+  inspectionId       String           @db.Uuid
+  goodsReceiptItemId String           @db.Uuid
+  quantityReceived   Int
+  acceptedQuantity   Int              @default(0)
+  rejectedQuantity   Int              @default(0)
+  condition          String?          @db.VarChar(100)
+  result             String           @default("PENDING") @db.VarChar(30)
+  remarks            String?          @db.VarChar(500)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  goodsReceiptItem   GoodsReceiptItem @relation(fields: [goodsReceiptItemId], references: [id])
+  inspection         Inspection       @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@unique([inspectionId, goodsReceiptItemId])
+  @@index([goodsReceiptItemId])
+  @@map("inspection_items")
+}
+
+model TechnicalEvaluation {
+  id           String     @id @default(uuid()) @db.Uuid
+  inspectionId String     @unique @db.Uuid
+  evaluatorId  String     @db.Uuid
+  decision     String     @db.VarChar(30)
+  remarks      String?    @db.VarChar(1000)
+  evaluatedAt  DateTime   @default(now())
+  evaluator    User       @relation("TechnicalEvaluator", fields: [evaluatorId], references: [id])
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([evaluatorId])
+  @@map("technical_evaluations")
+}
+
+model GRN {
+  id                  String               @id @default(uuid()) @db.Uuid
+  grnNumber           String               @unique @db.VarChar(50)
+  goodsReceiptId      String               @unique @db.Uuid
+  supplierId          String               @db.Uuid
+  storeId             String               @db.Uuid
+  purchaseReference   String?              @db.VarChar(100)
+  documentReference   String?              @db.VarChar(150)
+  grnDate             DateTime             @default(now())
+  status              String               @default("ACTIVE") @db.VarChar(30)
+  evaluationDecision  String               @db.VarChar(30)
+  evaluationRemarks   String?              @db.VarChar(1000)
+  inventoryUpdated    Boolean              @default(false)
+  inventoryPostedAt   DateTime?
+  createdById         String               @db.Uuid
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  items               GRNItem[]
+  createdBy           User                 @relation("GRNCreatedBy", fields: [createdById], references: [id])
+  goodsReceipt        GoodsReceipt         @relation(fields: [goodsReceiptId], references: [id])
+  store               Store                @relation("GRNStore", fields: [storeId], references: [id])
+  supplier            Supplier             @relation("GRNSupplier", fields: [supplierId], references: [id])
+  supportingDocuments SupportingDocument[]
+
+  @@index([supplierId])
+  @@index([storeId])
+  @@index([grnDate])
+  @@index([status])
+  @@map("grns")
+}
+
+model GRNItem {
+  id                  String           @id @default(uuid()) @db.Uuid
+  grnId               String           @db.Uuid
+  goodsReceiptItemId  String           @db.Uuid
+  itemId              String           @db.Uuid
+  locationId          String?          @db.Uuid
+  quantityReceived    Int
+  acceptedQuantity    Int
+  unit                String           @db.VarChar(50)
+  condition           String?          @db.VarChar(100)
+  assetClassification String           @default("NON_FIXED") @db.VarChar(30)
+  remarks             String?          @db.VarChar(500)
+  createdAt           DateTime         @default(now())
+  goodsReceiptItem    GoodsReceiptItem @relation(fields: [goodsReceiptItemId], references: [id])
+  grn                 GRN              @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  item                Item             @relation("GRNItems", fields: [itemId], references: [id])
+  location            Location?        @relation("GRNItemLocations", fields: [locationId], references: [id])
+
+  @@unique([grnId, goodsReceiptItemId])
+  @@index([itemId])
+  @@index([locationId])
+  @@map("grn_items")
+}
+
+model SupportingDocument {
+  id             String        @id @default(uuid()) @db.Uuid
+  goodsReceiptId String?       @db.Uuid
+  grnId          String?       @db.Uuid
+  documentType   String        @db.VarChar(50)
+  originalName   String        @db.VarChar(255)
+  mimeType       String?       @db.VarChar(100)
+  sizeBytes      Int?
+  storageKey     String?       @db.VarChar(500)
+  documentNumber String?       @db.VarChar(100)
+  description    String?       @db.VarChar(500)
+  uploadedById   String        @db.Uuid
+  createdAt      DateTime      @default(now())
+  goodsReceipt   GoodsReceipt? @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  grn            GRN?          @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  uploadedBy     User          @relation("SupportingDocumentUploader", fields: [uploadedById], references: [id])
+
+  @@index([goodsReceiptId])
+  @@index([grnId])
+  @@map("supporting_documents")
+}
+
+model DocumentSequence {
+  id          String   @id @default(uuid()) @db.Uuid
+  documentKey String   @db.VarChar(50)
+  year        Int
+  nextNumber  Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([documentKey, year])
+  @@map("document_sequences")
+}
+
+model InventoryBalance {
+  id           String             @id @default(uuid()) @db.Uuid
+  itemId       String             @db.Uuid
+  locationId   String             @db.Uuid
+  quantity     Decimal            @default(0) @db.Decimal(18, 3)
+  reservedQty  Decimal            @default(0) @db.Decimal(18, 3)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  binCards     BinCard[]
+  item         Item               @relation(fields: [itemId], references: [id])
+  location     Location           @relation(fields: [locationId], references: [id])
+  stockCards   StockCard[]
+  transactions StockTransaction[]
+
+  @@unique([itemId, locationId])
+  @@index([itemId])
+  @@index([locationId])
+  @@map("inventory_balances")
+}
+
+model StockTransaction {
+  id                String               @id @default(uuid()) @db.Uuid
+  transactionNumber String               @unique @db.VarChar(50)
+  type              StockTransactionType
+  itemId            String               @db.Uuid
+  locationId        String               @db.Uuid
+  quantity          Decimal              @db.Decimal(18, 3)
+  balanceBefore     Decimal              @db.Decimal(18, 3)
+  balanceAfter      Decimal              @db.Decimal(18, 3)
+  referenceType     String?              @db.VarChar(50)
+  referenceId       String?              @db.Uuid
+  reason            String?              @db.VarChar(500)
+  performedById     String               @db.Uuid
+  createdAt         DateTime             @default(now())
+  unitCost          Decimal?             @db.Decimal(18, 2)
+  binCards          BinCard[]
+  stockCards        StockCard[]
+  item              Item                 @relation(fields: [itemId], references: [id])
+  inventoryBalance  InventoryBalance     @relation(fields: [itemId, locationId], references: [itemId, locationId])
+  location          Location             @relation(fields: [locationId], references: [id])
+  performedBy       User                 @relation(fields: [performedById], references: [id])
+  transferItem      StockTransferItem?
+
+  @@index([itemId, locationId, createdAt])
+  @@index([type, createdAt])
+  @@index([performedById])
+  @@index([referenceType, referenceId])
+  @@map("stock_transactions")
+}
+
+model StockCard {
+  id               String               @id @default(uuid()) @db.Uuid
+  itemId           String               @db.Uuid
+  locationId       String               @db.Uuid
+  transactionId    String               @db.Uuid
+  transactionType  StockTransactionType
+  quantityIn       Decimal              @default(0) @db.Decimal(18, 3)
+  quantityOut      Decimal              @default(0) @db.Decimal(18, 3)
+  balance          Decimal              @db.Decimal(18, 3)
+  transactionDate  DateTime             @default(now())
+  item             Item                 @relation(fields: [itemId], references: [id])
+  inventoryBalance InventoryBalance     @relation(fields: [itemId, locationId], references: [itemId, locationId])
+  location         Location             @relation(fields: [locationId], references: [id])
+  transaction      StockTransaction     @relation(fields: [transactionId], references: [id])
+
+  @@index([itemId, transactionDate])
+  @@index([locationId, transactionDate])
+  @@map("stock_cards")
+}
+
+model BinCard {
+  id               String               @id @default(uuid()) @db.Uuid
+  itemId           String               @db.Uuid
+  locationId       String               @db.Uuid
+  transactionId    String               @db.Uuid
+  transactionType  StockTransactionType
+  quantityIn       Decimal              @default(0) @db.Decimal(18, 3)
+  quantityOut      Decimal              @default(0) @db.Decimal(18, 3)
+  balance          Decimal              @db.Decimal(18, 3)
+  transactionDate  DateTime             @default(now())
+  item             Item                 @relation(fields: [itemId], references: [id])
+  inventoryBalance InventoryBalance     @relation(fields: [itemId, locationId], references: [itemId, locationId])
+  location         Location             @relation(fields: [locationId], references: [id])
+  transaction      StockTransaction     @relation(fields: [transactionId], references: [id])
+
+  @@index([locationId, transactionDate])
+  @@index([itemId, locationId, transactionDate])
+  @@map("bin_cards")
+}
+
+model StockTransfer {
+  id                    String              @id @default(uuid()) @db.Uuid
+  transferNumber        String              @unique @db.VarChar(50)
+  sourceLocationId      String              @db.Uuid
+  destinationLocationId String              @db.Uuid
+  status                StockTransferStatus @default(DRAFT)
+  requestedById         String              @db.Uuid
+  approvedById          String?             @db.Uuid
+  reason                String?             @db.VarChar(500)
+  remarks               String?             @db.VarChar(1000)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  items                 StockTransferItem[]
+  approvedBy            User?               @relation("TransferApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+  destinationLocation   Location            @relation("TransferDestination", fields: [destinationLocationId], references: [id])
+  requestedBy           User                @relation("TransferRequester", fields: [requestedById], references: [id])
+  sourceLocation        Location            @relation("TransferSource", fields: [sourceLocationId], references: [id])
+
+  @@index([sourceLocationId])
+  @@index([destinationLocationId])
+  @@index([status])
+  @@index([requestedById])
+  @@map("stock_transfers")
+}
+
+model StockTransferItem {
+  id            String            @id @default(uuid()) @db.Uuid
+  transferId    String            @db.Uuid
+  itemId        String            @db.Uuid
+  quantity      Decimal           @db.Decimal(18, 3)
+  createdAt     DateTime          @default(now())
+  transactionId String?           @unique @db.Uuid
+  item          Item              @relation(fields: [itemId], references: [id])
+  transaction   StockTransaction? @relation(fields: [transactionId], references: [id])
+  transfer      StockTransfer     @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  @@unique([transferId, itemId])
+  @@index([itemId])
+  @@map("stock_transfer_items")
+}
+
+model StoreRequisition {
+  id            String                 @id @default(uuid()) @db.Uuid
+  requisitionNo String                 @unique @db.VarChar(50)
+  requesterId   String                 @db.Uuid
+  departmentId  String                 @db.Uuid
+  storeId       String                 @db.Uuid
+  purpose       String                 @db.VarChar(500)
+  requiredDate  DateTime?
+  remarks       String?                @db.VarChar(500)
+  status        StoreRequisitionStatus @default(DRAFT)
+  submittedAt   DateTime?
+  approvedAt    DateTime?
+  rejectedAt    DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  approvals     RequisitionApproval[]
+  issues        StoreIssue[]
+  items         StoreRequisitionItem[]
+  department    Department             @relation(fields: [departmentId], references: [id])
+  requester     User                   @relation("StoreRequisitionRequester", fields: [requesterId], references: [id])
+  store         Store                  @relation(fields: [storeId], references: [id])
+
+  @@index([requesterId])
+  @@index([departmentId])
+  @@index([storeId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("store_requisitions")
+}
+
+model StoreRequisitionItem {
+  id            String           @id @default(uuid()) @db.Uuid
+  requisitionId String           @db.Uuid
+  itemId        String           @db.Uuid
+  locationId    String?          @db.Uuid
+  requestedQty  Decimal          @db.Decimal(14, 3)
+  approvedQty   Decimal?         @db.Decimal(14, 3)
+  issuedQty     Decimal          @default(0) @db.Decimal(14, 3)
+  remarks       String?          @db.VarChar(500)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  issueItems    StoreIssueItem[]
+  item          Item             @relation(fields: [itemId], references: [id])
+  location      Location?        @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  requisition   StoreRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+
+  @@index([requisitionId])
+  @@index([itemId])
+  @@index([locationId])
+  @@map("store_requisition_items")
+}
+
+model RequisitionApproval {
+  id            String           @id @default(uuid()) @db.Uuid
+  requisitionId String           @db.Uuid
+  approverId    String           @db.Uuid
+  decision      ApprovalDecision
+  comments      String?          @db.VarChar(500)
+  decidedAt     DateTime         @default(now())
+  approver      User             @relation("RequisitionApprover", fields: [approverId], references: [id])
+  requisition   StoreRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+
+  @@index([requisitionId])
+  @@index([approverId])
+  @@map("requisition_approvals")
+}
+
+model StoreIssue {
+  id            String           @id @default(uuid()) @db.Uuid
+  issueNo       String           @unique @db.VarChar(50)
+  requisitionId String           @db.Uuid
+  storeId       String           @db.Uuid
+  issuedById    String           @db.Uuid
+  status        StoreIssueStatus @default(PICKING)
+  issueDate     DateTime         @default(now())
+  remarks       String?          @db.VarChar(500)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  vouchers      IssueVoucher[]
+  items         StoreIssueItem[]
+  issuedBy      User             @relation("StoreIssueIssuer", fields: [issuedById], references: [id])
+  requisition   StoreRequisition @relation(fields: [requisitionId], references: [id])
+  store         Store            @relation(fields: [storeId], references: [id])
+
+  @@index([requisitionId])
+  @@index([storeId])
+  @@index([issuedById])
+  @@index([status])
+  @@map("store_issues")
+}
+
+model StoreIssueItem {
+  id                String               @id @default(uuid()) @db.Uuid
+  storeIssueId      String               @db.Uuid
+  requisitionItemId String               @db.Uuid
+  itemId            String               @db.Uuid
+  locationId        String               @db.Uuid
+  requestedQty      Decimal              @db.Decimal(14, 3)
+  approvedQty       Decimal              @db.Decimal(14, 3)
+  issuedQty         Decimal              @db.Decimal(14, 3)
+  remarks           String?              @db.VarChar(500)
+  createdAt         DateTime             @default(now())
+  item              Item                 @relation(fields: [itemId], references: [id])
+  location          Location             @relation(fields: [locationId], references: [id])
+  requisitionItem   StoreRequisitionItem @relation(fields: [requisitionItemId], references: [id])
+  storeIssue        StoreIssue           @relation(fields: [storeIssueId], references: [id], onDelete: Cascade)
+
+  @@index([storeIssueId])
+  @@index([requisitionItemId])
+  @@index([itemId])
+  @@index([locationId])
+  @@map("store_issue_items")
+}
+
+model IssueVoucher {
+  id             String           @id @default(uuid()) @db.Uuid
+  voucherNo      String           @unique @db.VarChar(50)
+  type           IssueVoucherType
+  storeIssueId   String           @db.Uuid
+  issuedToUserId String?          @db.Uuid
+  departmentId   String           @db.Uuid
+  voucherDate    DateTime         @default(now())
+  remarks        String?          @db.VarChar(500)
+  createdAt      DateTime         @default(now())
+  department     Department       @relation(fields: [departmentId], references: [id])
+  issuedToUser   User?            @relation("IssueVoucherRecipient", fields: [issuedToUserId], references: [id], onDelete: Restrict)
+  storeIssue     StoreIssue       @relation(fields: [storeIssueId], references: [id])
+  gatePasses     GatePass[]
+
+  @@index([storeIssueId])
+  @@index([departmentId])
+  @@index([issuedToUserId])
+  @@index([type])
+  @@map("issue_vouchers")
+}
+
+model MaterialReturn {
+  id            String               @id @default(uuid()) @db.Uuid
+  returnNumber  String               @unique @db.VarChar(50)
+  storeIssueId  String               @db.Uuid
+  requesterId   String               @db.Uuid
+  departmentId  String               @db.Uuid
+  storeId       String               @db.Uuid
+  status        MaterialReturnStatus @default(RETURN_REQUEST)
+  reason        String?              @db.VarChar(500)
+  remarks       String?              @db.VarChar(1000)
+  receivedAt    DateTime?
+  inspectedAt   DateTime?
+  acceptedAt    DateTime?
+  rejectedAt    DateTime?
+  inspectedById String?              @db.Uuid
+  approvedById  String?              @db.Uuid
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  items         MaterialReturnItem[]
+  approver      User?                @relation("ReturnApprover", fields: [approvedById], references: [id])
+  inspector     User?                @relation("ReturnInspector", fields: [inspectedById], references: [id])
+  requester     User                 @relation("ReturnRequester", fields: [requesterId], references: [id])
+
+  @@index([storeIssueId])
+  @@index([requesterId])
+  @@index([departmentId])
+  @@index([storeId])
+  @@index([status])
+  @@map("material_returns")
+}
+
+model MaterialReturnItem {
+  id               String         @id @default(uuid()) @db.Uuid
+  returnId         String         @db.Uuid
+  itemId           String         @db.Uuid
+  locationId       String?        @db.Uuid
+  issuedQuantity   Int
+  returnedQuantity Int
+  acceptedQuantity Int            @default(0)
+  rejectedQuantity Int            @default(0)
+  condition        String?        @db.VarChar(50)
+  remarks          String?        @db.VarChar(500)
+  item             Item           @relation(fields: [itemId], references: [id])
+  location         Location?      @relation(fields: [locationId], references: [id])
+  returnRecord     MaterialReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  @@index([returnId])
+  @@index([itemId])
+  @@index([locationId])
+  @@map("material_return_items")
+}
+
+model Asset {
+  id                   String            @id @default(uuid()) @db.Uuid
+  assetNumber          String            @unique @db.VarChar(50)
+  itemId               String            @db.Uuid
+  serialNumber         String?           @unique @db.VarChar(100)
+  classification       String            @db.VarChar(30)
+  description          String?           @db.VarChar(1000)
+  acquisitionDate      DateTime?
+  acquisitionValue     Decimal?          @db.Decimal(14, 2)
+  status               String            @default("ACTIVE") @db.VarChar(30)
+  currentLocationId    String?           @db.Uuid
+  assignedUserId       String?           @db.Uuid
+  assignedDepartmentId String?           @db.Uuid
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  assignments          AssetAssignment[]
+  assignedDepartment   Department?       @relation(fields: [assignedDepartmentId], references: [id])
+  assignedUser         User?             @relation("AssetAssignedUser", fields: [assignedUserId], references: [id])
+  currentLocation      Location?         @relation(fields: [currentLocationId], references: [id])
+  item                 Item              @relation(fields: [itemId], references: [id])
+
+  @@index([itemId])
+  @@index([assignedUserId])
+  @@index([assignedDepartmentId])
+  @@index([currentLocationId])
+  @@index([status])
+  @@map("assets")
+}
+
+model AssetAssignment {
+  id           String      @id @default(uuid()) @db.Uuid
+  assetId      String      @db.Uuid
+  userId       String?     @db.Uuid
+  departmentId String?     @db.Uuid
+  assignedAt   DateTime    @default(now())
+  returnedAt   DateTime?
+  remarks      String?     @db.VarChar(500)
+  asset        Asset       @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  department   Department? @relation(fields: [departmentId], references: [id])
+  user         User?       @relation("AssetAssignmentUser", fields: [userId], references: [id])
+
+  @@index([assetId])
+  @@index([userId])
+  @@index([departmentId])
+  @@map("asset_assignments")
+}
+
+model UserMaterialCard {
+  id           String      @id @default(uuid()) @db.Uuid
+  cardNumber   String      @unique @db.VarChar(50)
+  userId       String      @db.Uuid
+  departmentId String?     @db.Uuid
+  status       String      @default("ACTIVE") @db.VarChar(30)
+  openedAt     DateTime    @default(now())
+  closedAt     DateTime?
+  remarks      String?     @db.VarChar(500)
+  department   Department? @relation("UserMaterialCardDepartment", fields: [departmentId], references: [id])
+  user         User        @relation("UserMaterialCardUser", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([departmentId])
+  @@index([status])
+  @@map("user_material_cards")
+}
+
+model GatePass {
+  id                String          @id @default(uuid()) @db.Uuid
+  gatePassNumber    String          @unique @db.VarChar(50)
+  issueVoucherId    String          @db.Uuid
+  issuedToUserId    String          @db.Uuid
+  departmentId      String?         @db.Uuid
+  destination       String?         @db.VarChar(255)
+  purpose           String?         @db.VarChar(500)
+  status            GatePassStatus  @default(CREATED)
+  createdAt         DateTime        @default(now())
+  verifiedAt        DateTime?
+  exitConfirmedAt   DateTime?
+  dispatchedAt      DateTime?
+  securityOfficerId String?         @db.Uuid
+  vehicleNumber     String?         @db.VarChar(50)
+  driverName        String?         @db.VarChar(150)
+  remarks           String?         @db.VarChar(1000)
+  dispatchRecords   DispatchRecord?
+  items             GatePassItem[]
+  issuedTo          User            @relation("GatePassIssuedTo", fields: [issuedToUserId], references: [id])
+  securityOfficer   User?           @relation("GatePassSecurityOfficer", fields: [securityOfficerId], references: [id])
+  issueVoucher      IssueVoucher    @relation(fields: [issueVoucherId], references: [id])
+  department        Department?     @relation(fields: [departmentId], references: [id])
+
+  @@index([issueVoucherId])
+  @@index([issuedToUserId])
+  @@index([status])
+  @@index([securityOfficerId])
+  @@map("gate_passes")
+}
+
+model GatePassItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  gatePassId  String   @db.Uuid
+  itemId      String   @db.Uuid
+  quantity    Int
+  description String?  @db.VarChar(500)
+  gatePass    GatePass @relation(fields: [gatePassId], references: [id], onDelete: Cascade)
+  item        Item     @relation(fields: [itemId], references: [id])
+
+  @@index([gatePassId])
+  @@index([itemId])
+  @@map("gate_pass_items")
+}
+
+model DispatchRecord {
+  id                String   @id @default(uuid()) @db.Uuid
+  gatePassId        String   @unique @db.Uuid
+  dispatchedAt      DateTime @default(now())
+  securityOfficerId String?  @db.Uuid
+  destination       String?  @db.VarChar(255)
+  vehicleNumber     String?  @db.VarChar(50)
+  driverName        String?  @db.VarChar(150)
+  remarks           String?  @db.VarChar(1000)
+  gatePass          GatePass @relation(fields: [gatePassId], references: [id])
+  securityOfficer   User?    @relation("DispatchSecurityOfficer", fields: [securityOfficerId], references: [id])
+
+  @@index([securityOfficerId])
+  @@index([dispatchedAt])
+  @@map("dispatch_records")
+}
+
+model StockTaking {
+  id            String             @id @default(uuid()) @db.Uuid
+  sessionNumber String             @unique @db.VarChar(50)
+  storeId       String             @db.Uuid
+  startedById   String             @db.Uuid
+  status        StockTakingStatus  @default(CREATED)
+  startedAt     DateTime           @default(now())
+  completedAt   DateTime?
+  remarks       String?            @db.VarChar(500)
+  counts        StockCount[]
+  discrepancies StockDiscrepancy[]
+  startedBy     User               @relation("StockTakingStartedBy", fields: [startedById], references: [id])
+  store         Store              @relation(fields: [storeId], references: [id])
+
+  @@index([storeId])
+  @@index([startedById])
+  @@index([status])
+  @@index([startedAt])
+  @@map("stock_takings")
+}
+
+model StockCount {
+  id               String      @id @default(uuid()) @db.Uuid
+  stockTakingId    String      @db.Uuid
+  itemId           String      @db.Uuid
+  locationId       String      @db.Uuid
+  systemQuantity   Decimal     @db.Decimal(14, 3)
+  physicalQuantity Decimal     @db.Decimal(14, 3)
+  countedById      String      @db.Uuid
+  countedAt        DateTime    @default(now())
+  remarks          String?     @db.VarChar(500)
+  countedBy        User        @relation("StockCountUser", fields: [countedById], references: [id])
+  item             Item        @relation(fields: [itemId], references: [id])
+  location         Location    @relation(fields: [locationId], references: [id])
+  stockTaking      StockTaking @relation(fields: [stockTakingId], references: [id], onDelete: Cascade)
+
+  @@unique([stockTakingId, itemId, locationId])
+  @@index([itemId])
+  @@index([locationId])
+  @@index([countedById])
+  @@map("stock_counts")
+}
+
+model StockDiscrepancy {
+  id               String            @id @default(uuid()) @db.Uuid
+  stockTakingId    String            @db.Uuid
+  itemId           String            @db.Uuid
+  locationId       String            @db.Uuid
+  systemQuantity   Decimal           @db.Decimal(14, 3)
+  physicalQuantity Decimal           @db.Decimal(14, 3)
+  difference       Decimal           @db.Decimal(14, 3)
+  reason           String?           @db.VarChar(255)
+  investigation    String?           @db.VarChar(1000)
+  investigatedById String?           @db.Uuid
+  investigatedAt   DateTime?
+  status           String            @default("OPEN") @db.VarChar(30)
+  stockAdjustments StockAdjustment[]
+  investigatedBy   User?             @relation("DiscrepancyInvestigator", fields: [investigatedById], references: [id])
+  item             Item              @relation(fields: [itemId], references: [id])
+  location         Location          @relation(fields: [locationId], references: [id])
+  stockTaking      StockTaking       @relation(fields: [stockTakingId], references: [id], onDelete: Cascade)
+
+  @@unique([stockTakingId, itemId, locationId])
+  @@index([stockTakingId])
+  @@index([itemId])
+  @@index([locationId])
+  @@index([status])
+  @@map("stock_discrepancies")
+}
+
+model StockAdjustment {
+  id               String            @id @default(uuid()) @db.Uuid
+  adjustmentNumber String            @unique @db.VarChar(50)
+  discrepancyId    String?           @db.Uuid
+  itemId           String            @db.Uuid
+  locationId       String            @db.Uuid
+  quantity         Decimal           @db.Decimal(14, 3)
+  direction        String            @db.VarChar(20)
+  reason           String            @db.VarChar(500)
+  status           String            @default("PENDING_APPROVAL") @db.VarChar(30)
+  requestedById    String            @db.Uuid
+  approvedById     String?           @db.Uuid
+  requestedAt      DateTime          @default(now())
+  approvedAt       DateTime?
+  rejectedAt       DateTime?
+  rejectionReason  String?           @db.VarChar(500)
+  approvedBy       User?             @relation("AdjustmentApprover", fields: [approvedById], references: [id])
+  discrepancy      StockDiscrepancy? @relation(fields: [discrepancyId], references: [id])
+  item             Item              @relation(fields: [itemId], references: [id])
+  location         Location          @relation(fields: [locationId], references: [id])
+  requestedBy      User              @relation("AdjustmentRequester", fields: [requestedById], references: [id])
+
+  @@index([discrepancyId])
+  @@index([itemId])
+  @@index([locationId])
+  @@index([status])
+  @@map("stock_adjustments")
+}
+
+model StockBatch {
+  id                String    @id @default(uuid()) @db.Uuid
+  batchNumber       String    @db.VarChar(100)
+  itemId            String    @db.Uuid
+  locationId        String    @db.Uuid
+  quantity          Decimal   @default(0) @db.Decimal(14, 3)
+  manufacturingDate DateTime?
+  expiryDate        DateTime?
+  status            String    @default("ACTIVE") @db.VarChar(30)
+  damaged           Boolean   @default(false)
+  obsolete          Boolean   @default(false)
+  remarks           String?   @db.VarChar(500)
+  item              Item      @relation(fields: [itemId], references: [id])
+  location          Location  @relation(fields: [locationId], references: [id])
+
+  @@unique([batchNumber, itemId, locationId])
+  @@index([itemId])
+  @@index([locationId])
+  @@index([expiryDate])
+  @@index([status])
+  @@index([damaged])
+  @@index([obsolete])
+  @@map("stock_batches")
+}
+
+model DisposalRequest {
+  id               String            @id @default(uuid()) @db.Uuid
+  requestNumber    String            @unique @db.VarChar(50)
+  itemId           String            @db.Uuid
+  locationId       String            @db.Uuid
+  quantity         Decimal           @db.Decimal(14, 3)
+  reason           String            @db.VarChar(500)
+  status           String            @default("REQUESTED") @db.VarChar(30)
+  requestedById    String            @db.Uuid
+  inspectedById    String?           @db.Uuid
+  approvedById     String?           @db.Uuid
+  inspectionResult String?           @db.VarChar(1000)
+  requestedAt      DateTime          @default(now())
+  inspectedAt      DateTime?
+  approvedAt       DateTime?
+  approval         DisposalApproval?
+  record           DisposalRecord?
+  approvedBy       User?             @relation("DisposalApprover", fields: [approvedById], references: [id])
+  inspectedBy      User?             @relation("DisposalInspector", fields: [inspectedById], references: [id])
+  item             Item              @relation(fields: [itemId], references: [id])
+  location         Location          @relation(fields: [locationId], references: [id])
+  requestedBy      User              @relation("DisposalRequester", fields: [requestedById], references: [id])
+
+  @@index([itemId])
+  @@index([locationId])
+  @@index([status])
+  @@map("disposal_requests")
+}
+
+model DisposalApproval {
+  id                String          @id @default(uuid()) @db.Uuid
+  disposalRequestId String          @unique @db.Uuid
+  approved          Boolean
+  approvedById      String          @db.Uuid
+  remarks           String?         @db.VarChar(500)
+  approvedAt        DateTime        @default(now())
+  approvedBy        User            @relation("DisposalApprovalUser", fields: [approvedById], references: [id])
+  disposalRequest   DisposalRequest @relation(fields: [disposalRequestId], references: [id], onDelete: Cascade)
+
+  @@index([approvedById])
+  @@map("disposal_approvals")
+}
+
+model DisposalRecord {
+  id                String          @id @default(uuid()) @db.Uuid
+  disposalRequestId String          @unique @db.Uuid
+  disposalNumber    String          @unique @db.VarChar(50)
+  quantity          Decimal         @db.Decimal(14, 3)
+  disposalMethod    String          @db.VarChar(100)
+  disposedById      String          @db.Uuid
+  disposedAt        DateTime        @default(now())
+  remarks           String?         @db.VarChar(500)
+  disposalRequest   DisposalRequest @relation(fields: [disposalRequestId], references: [id])
+  disposedBy        User            @relation("DisposalRecorder", fields: [disposedById], references: [id])
+
+  @@index([disposedById])
+  @@index([disposedAt])
+  @@map("disposal_records")
+}
+
+model Notification {
+  id         String           @id @default(uuid()) @db.Uuid
+  userId     String           @db.Uuid
+  type       NotificationType
+  title      String           @db.VarChar(200)
+  message    String           @db.VarChar(1000)
+  entityType String?          @db.VarChar(100)
+  entityId   String?          @db.Uuid
+  isRead     Boolean          @default(false)
+  readAt     DateTime?
+  metadata   Json?
+  createdAt  DateTime         @default(now())
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([type, createdAt])
+  @@index([entityType, entityId])
+  @@map("notifications")
+}
+
+enum ProcurementStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum DeliveryStatus {
+  IN_TRANSIT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum StockTransactionType {
+  INBOUND
+  OUTBOUND
+  TRANSFER
+  RETURN
+  ADJUSTMENT
+}
+
+enum StockTransferStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum StoreRequisitionStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PICKING
+  ISSUED
+  COMPLETED
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+}
+
+enum StoreIssueStatus {
+  PICKING
+  ISSUED
+  COMPLETED
+  CANCELLED
+}
+
+enum IssueVoucherType {
+  SIV
+  ISIV
+}
+
+enum MaterialReturnStatus {
+  RETURN_REQUEST
+  RECEIVED
+  INSPECTED
+  ACCEPTED
+  REJECTED
+}
+
+enum GatePassStatus {
+  CREATED
+  SECURITY_VERIFIED
+  EXIT_CONFIRMED
+  DISPATCH_RECORDED
+  CANCELLED
+}
+
+enum StockTakingStatus {
+  CREATED
+  COUNTING
+  COUNTED
+  INVESTIGATING
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  ADJUSTED
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  LOW_STOCK
+  PENDING_APPROVAL
+  GOODS_RECEIVED
+  INSPECTION_REQUIRED
+  TRANSFER_APPROVAL
+  DISPOSAL_APPROVAL
+  STOCK_DISCREPANCY
+  SYSTEM
+}
