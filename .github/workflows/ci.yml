@@ -1,4 +1,4 @@
-```yaml
+
 name: CI
 
 on:
@@ -60,4 +60,4 @@ jobs:
 
       - name: Generate Prisma Client
         run: npm run prisma:generate
-```
+
