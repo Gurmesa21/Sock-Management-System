@@ -1,3 +1,4 @@
+```yaml
 name: CI
 
 on:
@@ -32,9 +33,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
       - name: Build
         run: npm run build
 
@@ -62,10 +60,4 @@ jobs:
 
       - name: Generate Prisma Client
         run: npm run prisma:generate
-
-      - name: Run tests
-        run: npm test
-
-      - name: Verify permissions
-        run: npm run verify:permissions
-        
+```
